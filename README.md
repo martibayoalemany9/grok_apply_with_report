@@ -93,6 +93,25 @@ open "$JOB_APPLY_WORKDIR/applications_progress_report.html"
 | Reopen gap | 10s before navigating |
 | Stuck grace | 60s before give-up |
 
+
+## Reports (always included)
+
+After every apply (unless `--no-report`), the entrypoint regenerates and **opens**:
+
+| File | Meaning |
+|------|---------|
+| `applications_progress_report.html` | Success / fail / progress bars |
+| `applications_dashboard.html` | Full application table |
+| `automation_comparison.html` | Stack comparison (if ledger present) |
+| `EFFECTIVENESS_REPORT.md` | KPI effectiveness (if script present) |
+
+```bash
+python3 grok_apply_with_report.py                 # apply + all reports + open HTML
+python3 grok_apply_with_report.py --report-only  # reports only
+python3 grok_apply_with_report.py --serve        # also HTTP :8790
+OPEN_REPORT=0 python3 grok_apply_with_report.py  # generate but do not open windows
+```
+
 ## Layout
 
 ```text

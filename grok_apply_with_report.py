@@ -1,32 +1,22 @@
 #!/usr/bin/env python3
-"""Grok apply-with-report — one job application, then regenerate progress report.
+"""Grok apply-with-report — one job application, then ALWAYS regenerate + open reports.
 
-Usage (from a private workdir that has CV + queue + prefs, with this repo on PYTHONPATH
-or installed next to your data):
+Reports (always included unless --no-report):
+  - applications_progress_report.html
+  - applications_dashboard.html
+  - automation_comparison.html / AUTOMATION_COMPARISON.md (if generator present)
+  - EFFECTIVENESS_REPORT.md (if measure_effectiveness present)
 
-  # Point at your private data directory (CVs, ledger, queue — never commit these)
-  export JOB_APPLY_WORKDIR=~/deepline/data/karlsruhe-public-co-job-apps
-
-  # One application at a time (default)
-  python3 grok_apply_with_report.py
-
-  # Report only (no browser apply)
+  python3 grok_apply_with_report.py              # apply + all reports + open
   python3 grok_apply_with_report.py --report-only
+  python3 grok_apply_with_report.py --serve      # also serve on :8790
 
-  # Apply only
-  python3 grok_apply_with_report.py --apply-only
-
-  # Then open HTML report
-  open applications_progress_report.html   # inside WORKDIR
-
-Env (common):
-  COMPLETE_MAX=1                 # default 1 — one application per run
-  APPLY_BROWSER=chromium         # chromium | chrome | firefox | cloud_mobile
-  CDP_URL=http://127.0.0.1:9223
-  APPLY_BROWSER_FULLSCREEN=1
-  COMPLETE_QUEUE_CSV=applications_eu_all.csv
-  APPLY_CV_FILE=cv.pdf
-  JOB_APPLY_WORKDIR=/path/to/private/data
+Env:
+  COMPLETE_MAX=1
+  JOB_APPLY_WORKDIR=...
+  OPEN_REPORT=1          # open HTML in browser (default on)
+  INCLUDE_COMPARISON=1
+  INCLUDE_EFFECTIVENESS=1
 """
 from __future__ import annotations
 
@@ -34,6 +24,7 @@ import argparse
 import os
 import subprocess
 import sys
+import webbrowser
 from pathlib import Path
 
 
@@ -45,11 +36,9 @@ def _workdir() -> Path:
     env = (os.environ.get("JOB_APPLY_WORKDIR") or "").strip()
     if env:
         return Path(env).expanduser().resolve()
-    # If running from inside a data workdir that already has complete_apply
     here = Path.cwd()
     if (here / "complete_apply.py").is_file() or (here / "applications_ledger.jsonl").is_file():
         return here
-    # Default: sibling private data path (user-specific; override with JOB_APPLY_WORKDIR)
     candidate = Path.home() / "deepline/data/karlsruhe-public-co-job-apps"
     if candidate.is_dir():
         return candidate
@@ -63,12 +52,17 @@ def _python() -> str:
     return sys.executable
 
 
+def _find_script(workdir: Path, name: str) -> Path | None:
+    for base in (workdir, _repo_root() / "src", _repo_root()):
+        p = base / name
+        if p.is_file():
+            return p
+    return None
+
+
 def _ensure_path(workdir: Path) -> None:
-    """Prefer workdir modules (live data project); fall back to repo src/."""
     root = _repo_root()
-    src = root / "src"
-    # Workdir first so private complete_apply / prefs win when present
-    for p in (str(workdir), str(src), str(root)):
+    for p in (str(workdir), str(root / "src"), str(root)):
         if p not in sys.path:
             sys.path.insert(0, p)
 
@@ -86,61 +80,104 @@ def run_apply(workdir: Path) -> int:
     os.environ.setdefault("GIVE_UP_GRACE_SEC", "60")
 
     py = _python()
-    # Prefer workdir complete_apply if present
-    script = workdir / "complete_apply.py"
-    if not script.is_file():
-        script = _repo_root() / "src" / "complete_apply.py"
-    if not script.is_file():
-        print("ERROR: complete_apply.py not found in workdir or src/", file=sys.stderr)
+    script = _find_script(workdir, "complete_apply.py")
+    if not script:
+        print("ERROR: complete_apply.py not found", file=sys.stderr)
         return 2
-
     print(f"[apply] COMPLETE_MAX={os.environ.get('COMPLETE_MAX')} workdir={workdir}")
     print(f"[apply] script={script}")
+    return subprocess.call([py, "-u", str(script)], cwd=str(workdir), env=os.environ.copy())
+
+
+def _run_py(workdir: Path, name: str) -> int:
+    script = _find_script(workdir, name)
+    if not script:
+        print(f"[report] skip missing {name}")
+        return 0
+    print(f"[report] {name}")
     return subprocess.call(
-        [py, "-u", str(script)],
+        [_python(), "-u", str(script)],
         cwd=str(workdir),
         env=os.environ.copy(),
     )
 
 
+def open_reports(workdir: Path) -> None:
+    """Open generated HTML reports (separate browser windows from Grok TUI)."""
+    flag = (os.environ.get("OPEN_REPORT") or "1").strip().lower()
+    if flag in ("0", "false", "no", "off"):
+        return
+    files = [
+        workdir / "applications_progress_report.html",
+        workdir / "applications_dashboard.html",
+        workdir / "automation_comparison.html",
+    ]
+    for f in files:
+        if not f.is_file():
+            continue
+        uri = f.resolve().as_uri()
+        print(f"[report] open {f.name}")
+        try:
+            # macOS: prefer open -a so it is a real window
+            if sys.platform == "darwin":
+                subprocess.Popen(
+                    ["open", str(f)],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                webbrowser.open(uri)
+        except Exception as e:
+            print(f"[report] open failed {f.name}: {e}")
+
+
 def run_report(workdir: Path) -> int:
-    py = _python()
-    gen = workdir / "generate_progress_report.py"
-    if not gen.is_file():
-        gen = _repo_root() / "src" / "generate_progress_report.py"
-    if not gen.is_file():
-        print("ERROR: generate_progress_report.py not found", file=sys.stderr)
-        return 2
-    print(f"[report] generating from ledger in {workdir}")
-    rc = subprocess.call([py, "-u", str(gen)], cwd=str(workdir), env=os.environ.copy())
+    """Always regenerate progress + dashboard (+ comparison / effectiveness)."""
+    print(f"[report] generating all reports in {workdir}")
+    rc = 0
+    # Core progress report (required)
+    r = _run_py(workdir, "generate_progress_report.py")
+    rc = rc or r
     out = workdir / "applications_progress_report.html"
     if out.is_file():
         print(f"[report] wrote {out}")
-    # Optional dashboard
-    dash = workdir / "generate_applications_dashboard.py"
-    if not dash.is_file():
-        dash = _repo_root() / "src" / "generate_applications_dashboard.py"
-    if dash.is_file():
-        subprocess.call([py, "-u", str(dash)], cwd=str(workdir), env=os.environ.copy())
+    else:
+        print("[report] WARNING: progress report HTML missing", file=sys.stderr)
+        rc = rc or 1
+
+    # Dashboard always
+    r = _run_py(workdir, "generate_applications_dashboard.py")
+    rc = rc or r
+
+    # Comparison stack report
+    if (os.environ.get("INCLUDE_COMPARISON") or "1").lower() not in ("0", "false", "no"):
+        r = _run_py(workdir, "report_automation_comparison.py")
+        # non-fatal if missing
+
+    # Effectiveness metrics markdown
+    if (os.environ.get("INCLUDE_EFFECTIVENESS") or "1").lower() not in ("0", "false", "no"):
+        _run_py(workdir, "measure_effectiveness.py")
+
+    open_reports(workdir)
     return rc
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="One apply + progress report")
-    parser.add_argument("--apply-only", action="store_true")
-    parser.add_argument("--report-only", action="store_true")
-    parser.add_argument(
-        "--workdir",
-        type=Path,
-        default=None,
-        help="Private data directory (CVs, ledger, queues)",
-    )
+    parser = argparse.ArgumentParser(description="One apply + full progress reports")
+    parser.add_argument("--apply-only", action="store_true", help="Skip reports (not recommended)")
+    parser.add_argument("--report-only", action="store_true", help="Only regenerate + open reports")
+    parser.add_argument("--no-report", action="store_true", help="Alias of --apply-only")
+    parser.add_argument("--no-open", action="store_true", help="Do not open HTML in browser")
+    parser.add_argument("--workdir", type=Path, default=None)
     parser.add_argument(
         "--serve",
         action="store_true",
-        help="After report, serve HTML on PROGRESS_PORT (default 8790)",
+        help="After report, serve on PROGRESS_PORT (default 8790)",
     )
     args = parser.parse_args()
+
+    if args.no_open:
+        os.environ["OPEN_REPORT"] = "0"
 
     workdir = (args.workdir or _workdir()).expanduser().resolve()
     if not workdir.is_dir():
@@ -151,20 +188,24 @@ def main() -> int:
 
     print(f"grok_apply_with_report | workdir={workdir}")
 
+    skip_report = args.apply_only or args.no_report
     rc = 0
     if not args.report_only:
         rc = run_apply(workdir)
         print(f"[apply] exit={rc}")
-    if not args.apply_only:
+
+    # Report is included by default after every apply
+    if not skip_report:
         rrc = run_report(workdir)
         print(f"[report] exit={rrc}")
         rc = rc or rrc
+    else:
+        print("[report] skipped (--apply-only / --no-report)")
+
     if args.serve:
-        serve = workdir / "serve_progress_report.py"
-        if not serve.is_file():
-            serve = _repo_root() / "src" / "serve_progress_report.py"
-        if serve.is_file():
-            print("[serve] starting progress report server…")
+        serve = _find_script(workdir, "serve_progress_report.py")
+        if serve:
+            print("[serve] progress report server…")
             return subprocess.call(
                 [_python(), "-u", str(serve)],
                 cwd=str(workdir),
