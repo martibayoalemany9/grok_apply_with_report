@@ -1,0 +1,35 @@
+{
+  "gender": "Male",
+  "contact": {
+    "email": "you@example.com",
+    "phone": "+490000000000"
+  },
+  "name": {
+    "first": "First",
+    "last": "Lastname",
+    "full": "First Lastname"
+  },
+  "residence": {
+    "city": "City",
+    "country": "Germany",
+    "street": "Street 1",
+    "postal_code": "00000"
+  },
+  "salary_target_eur": {
+    "min": 70400,
+    "max": 90000
+  },
+  "eeo": {
+    "race_ethnicity": "White",
+    "protected_veteran": "No",
+    "disability": "No"
+  },
+  "documents": {
+    "cv_primary": "cv.pdf",
+    "certificates_compressed": "certificates.pdf"
+  },
+  "work_authorization": {
+    "eu": "Yes",
+    "require_sponsorship_eu": "No"
+  }
+}

@@ -1,0 +1,43 @@
+# Secrets & credentials
+.env
+.env.*
+credentials_local.env
+*.pem
+*.key
+
+# Personal documents
+*.pdf
+*.docx
+*.doc
+cv*
+certs*
+cover_letters/
+
+# Application data / ledgers (private)
+applications_*.csv
+applications_*.json
+applications_*.jsonl
+applications_ledger.*
+APPLIED_COMPANIES.md
+succeeded_applications.md
+complete_apply_results.json
+*.log
+screenshots/
+apply_logs/
+__pycache__/
+*.pyc
+.pytest_cache/
+.cdp_apply.lock
+.APPLICATIONS_PAUSED
+candidate_prefs.json
+job_crawler_identity.json
+results/
+.DS_Store
+.venv/
+venv/
+
+# Local progress HTML (regenerated)
+applications_progress_report.html
+applications_dashboard.html
+automation_comparison.html
+EFFECTIVENESS_REPORT.*

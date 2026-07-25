@@ -1,0 +1,4 @@
+playwright>=1.40.0
+robotframework>=6.0
+Appium-Python-Client>=4.0
+selenium>=4.15
