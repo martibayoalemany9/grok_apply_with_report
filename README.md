@@ -75,6 +75,33 @@ python3 grok_apply_with_report.py --report-only
 ./scripts/run_one_apply_with_report.sh
 ```
 
+### Apify Google Jobs (johnvc)
+
+Actor: [johnvc/Google-Jobs-Scraper](https://console.apify.com/actors/CkLDY9GAQf6QlP6GP/input)
+
+```bash
+export APIFY_TOKEN=apify_api_...
+# Default search: Senior Software Engineer · Germany
+python3 scripts/run_apify_google_jobs.py
+
+# Custom input JSON
+python3 scripts/run_apify_google_jobs.py \
+  --input examples/apify_google_jobs_input.json \
+  --out google_jobs_results.json
+```
+
+Example input:
+
+```json
+{
+  "include_lrad": false,
+  "location": "Germany",
+  "lrad_value": "5",
+  "output_file": "google_jobs_results.json",
+  "query": "Senior Software Engineer"
+}
+```
+
 Open the report:
 
 ```bash

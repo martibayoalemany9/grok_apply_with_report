@@ -1,0 +1,12 @@
+{
+  "include_lrad": false,
+  "location": "Germany",
+  "lrad_value": "5",
+  "output_file": "google_jobs_results.json",
+  "query": "Senior Software Engineer",
+  "country": "de",
+  "language": "en",
+  "google_domain": "google.de",
+  "num_results": 50,
+  "max_pagination": 5
+}
